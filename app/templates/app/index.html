@@ -1,0 +1,35 @@
+<!-- app/templates/app/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Chat Rooms</title>
+</head>
+<body>
+Enter the post link:<br/>
+<input id="post-link-input" type="text" size="100"/><br/>
+<input id="submit" type="button" value="Enter"/>
+
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script>
+    var web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
+
+    $("#submit").on("click", function () {
+        console.log(web_socket)
+
+        web_socket.send(JSON.stringify(
+            {
+                'data': 'helloworld'
+            }
+            )
+        );
+    })
+
+
+    web_socket.onmessage = function (e) {
+        console.log(e.data)
+    }
+
+</script>
+</body>
+</html>

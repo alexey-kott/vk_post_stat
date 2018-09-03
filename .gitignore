@@ -1,0 +1,4 @@
+venv/
+.idea/
+vk_post_stat/settings.py
+__pycache__/
