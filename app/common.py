@@ -1,7 +1,8 @@
 import json
-from asyncio import sleep
+# from asyncio import sleep
+from time import sleep
 from dataclasses import dataclass
-from typing import List, Dict, Any, Tuple, Union
+from typing import List, Dict, Any, Tuple, Union, Set
 
 from aiohttp import ClientSession
 
@@ -22,13 +23,13 @@ def delay(func):
 @dataclass
 class Post:
     post_link: str  # V
-    name: str  # V
+    club_name: str  # V
     club_link: str  # V
-    community_members: int  # V
-    coverage: int
+    members_amount: int  # V
+    views: int  # V
     likes: int  # V
-    reposts: int  # ???
-    comment_amount: int  # V
+    # reposts: int  # ВК выключил
+    comments_amount: int  # V
     comments: List[Dict[str, Any]]  # V
 
 
@@ -73,8 +74,6 @@ async def get_post_comments(owner_id: int, post_id: int) -> Tuple[int, List[Dict
         async with session.get(url, params=params) as response:
             text = await response.text()
             data = json.loads(text)
-
-            print(response.real_url)
 
             return data['response']['count'], data['response']['items']
 
@@ -127,20 +126,17 @@ async def get_community_members(group_id: Union[int, str]) -> Tuple[int, List[in
 
 
 @delay
-async def get_post_stat(owner_id: int, post_id: int):
-    params['owner_id'] = owner_id
-    params['post_id'] = post_id
+async def get_post_views(owner_id: int, post_id: int) -> int:
+    params['posts'] = f"{owner_id}_{post_id}"
     params['count'] = 1000
-    url = "https://api.vk.com/method/stats.getPostReach"
+    url = "https://api.vk.com/method/wall.getById"
 
     async with ClientSession() as session:
         async with session.get(url, params=params) as response:
             text = await response.text()
             data = json.loads(text)
 
-            print(response.real_url)
-
-            print(data)
+            return int(data['response'][0]['views']['count'])
 
 
 def write(data: str) -> None:
@@ -148,24 +144,8 @@ def write(data: str) -> None:
         file.write(data)
 
 
-async def parse_post_info():
-    links = ["https://vk.com/true_lentach?w=wall-125004421_2045921",
-             # "https://vk.com/wall-146062039_53470",
-             # "https://vk.com/wall-156003502_46435",
-             # "https://vk.com/wall-67655918_36202",
-             # "https://vk.com/wall-141790181_42079",
-             # "https://vk.com/wall-147325343_386748",
-             # "https://vk.com/wall-159071178_19866",
-             # "https://vk.com/wall-156437731_46196",
-             # "https://vk.com/wall-141744392_83802",
-             # "https://vk.com/wall-104894009_102413",
-             # "https://vk.com/wall-159071189_7290",
-             # "https://vk.com/wall-158192742_43804",
-             # "https://vk.com/wall-159071186_47872"
-             ]
-
+async def parse_posts_info(links: List[str]) -> Set[Post]:
     posts = set()
-
     groups = await get_groups_info(links)
     id_group_map = {group['id']: group for group in groups}
 
@@ -174,16 +154,23 @@ async def parse_post_info():
             owner_id = int(link.split('wall')[1].split('_')[0])  # owner -- group, public page or user
             post_id = int(link.split('-')[1].split('_')[1])
 
-            # likes, like_users = await get_post_likes(owner_id, post_id)
-            # comments_amount, comments = await get_post_comments(owner_id, post_id)
-
+            likes, like_users = await get_post_likes(owner_id, post_id)
+            comments_amount, comments = await get_post_comments(owner_id, post_id)
             # repost_items, repost_profiles, repost_groups = await get_post_reposts(owner_id, post_id)
+            members, member_items = await get_community_members(owner_id)
+            views = await get_post_views(owner_id, post_id)
 
-            # members, member_items = await get_community_members(owner_id)
-
-            stat = await get_post_stat(owner_id, post_id)
-
-
-
+            post = Post(club_link=id_group_map[owner_id]['screen_name'],
+                        club_name=id_group_map[owner_id]['name'],
+                        comments_amount=comments_amount,
+                        members_amount=members,
+                        comments=comments,
+                        post_link=link,
+                        likes=likes,
+                        views=views,
+                        )
+            posts.add(post)
         except KeyError as e:
             print(e)
+
+    return posts

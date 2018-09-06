@@ -4,32 +4,64 @@
 <head>
     <meta charset="utf-8"/>
     <title>VK Post Stat</title>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+          integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+            crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+            integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+            crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+            integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+            crossorigin="anonymous"></script>
+
+
 </head>
 <body>
-Enter the post link:<br/>
-<input id="post-link-input" type="text" size="100"/><br/>
-<input id="submit" type="button" value="Enter"/>
+<div class="container">
+    <form class="form-horizontal">
+        <textarea class="form-control" rows="15" id="input">
+            https://vk.com/true_lentach?w=wall-125004421_2045921
+            https://vk.com/wall-146062039_53470
+            https://vk.com/wall-156003502_46435
+            https://vk.com/wall-67655918_36202
+            https://vk.com/wall-141790181_42079
+            https://vk.com/wall-147325343_386748
+            https://vk.com/wall-159071178_19866
+            https://vk.com/wall-156437731_46196
+            https://vk.com/wall-141744392_83802
+            https://vk.com/wall-104894009_102413
+            https://vk.com/wall-159071189_7290
+            https://vk.com/wall-158192742_43804
+            https://vk.com/wall-159071186_4787
+        </textarea>
+        <div class="form-group">
+            <button id="submit" type="button" class="btn btn-info btn-block">Submit</button>
+        </div>
+    </form>
+</div>
 
-<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
-<script>
-    var web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
+    <script>
+        var web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
 
-    $("#submit").on("click", function () {
-        console.log(web_socket)
+        $("#submit").on("click", function (e) {
+            var input = $("#input").val();
+            web_socket.send(JSON.stringify(
+                {
+                    'method': 'get_posts_stat',
+                    'data': input
+                }
+                )
+            );
+        });
 
-        web_socket.send(JSON.stringify(
-            {
-                'data': 'helloworld'
-            }
-            )
-        );
-    })
+        web_socket.onmessage = function (e) {
+            console.log(e.data)
+        }
 
+    </script>
 
-    web_socket.onmessage = function (e) {
-        console.log(e.data)
-    }
-
-</script>
 </body>
 </html>
