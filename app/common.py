@@ -1,10 +1,16 @@
+import dataclasses
 import json
+import time
 # from asyncio import sleep
 from time import sleep
+import hashlib
 from dataclasses import dataclass
-from typing import List, Dict, Any, Tuple, Union, Set
+from typing import List, Dict, Any, Tuple, Union
 
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 from aiohttp import ClientSession
+from channels.generic.websocket import AsyncWebsocketConsumer
 
 from vk_post_stat.settings import VK_SERVICE_TOKEN
 
@@ -144,10 +150,45 @@ def write(data: str) -> None:
         file.write(data)
 
 
-async def parse_posts_info(links: List[str]) -> Set[Post]:
-    posts = set()
+async def send_object_to_client(consumer: AsyncWebsocketConsumer, obj: Any) -> None:
+    await consumer.send(text_data=json.dumps({
+        'data': dataclasses.asdict(obj)
+    }))
+
+
+def get_file_name():
+    str_time = str(time.time()).encode('utf-8')
+    m = hashlib.md5()
+    m.update(str_time)
+    name_hash_part = m.hexdigest()[:10]
+
+    return f"vk_post_stat-{name_hash_part}.xlsx"
+
+
+def generate_excel(posts: List[Post]):
+    wb = Workbook()
+    ws = wb.create_sheet("Default", index=0)
+    ws.append(['Ссылка на запись', 'Название сообщества',
+               'Ссылка на сообщество', 'Количество подписчиков',
+               'Охват записи', 'Количество лайков', 'Количество комментариев'])
+
+    for i, post in enumerate(posts):
+        ws.append([post.post_link, post.club_name, post.club_link, post.members_amount, post.views, post.likes, post.comments_amount])
+
+    for i, column in enumerate(ws.columns):
+        ws.column_dimensions[get_column_letter(i+1)].width = 25
+
+    file_name = get_file_name()
+    wb.save(f"./static/files/{file_name}")
+
+    return file_name
+
+
+async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -> str:
+    posts = []
+
     groups = await get_groups_info(links)
-    id_group_map = {group['id']: group for group in groups}
+    id_group_map = {-group['id']: group for group in groups}
 
     for link in links:
         try:
@@ -169,8 +210,10 @@ async def parse_posts_info(links: List[str]) -> Set[Post]:
                         likes=likes,
                         views=views,
                         )
-            posts.add(post)
-        except KeyError as e:
+            posts.append(post)
+
+            await send_object_to_client(consumer, post)
+        except Exception as e:
             print(e)
 
-    return posts
+    return generate_excel(posts)
