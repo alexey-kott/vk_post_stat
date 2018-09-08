@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from aiohttp import ClientSession
 from channels.generic.websocket import AsyncWebsocketConsumer
+from selenium.webdriver import Chrome, ChromeOptions
 
 from vk_post_stat.settings import VK_SERVICE_TOKEN
 
@@ -31,6 +32,7 @@ class Post:
     post_link: str  # V
     club_name: str  # V
     club_link: str  # V
+    screenshot_name: str
     members_amount: int  # V
     views: int  # V
     likes: int  # V
@@ -145,6 +147,19 @@ async def get_post_views(owner_id: int, post_id: int) -> int:
             return int(data['response'][0]['views']['count'])
 
 
+@delay
+async def get_users_by_id(user_ids: List[int]):
+    params['user_ids'] = str(user_ids)
+    url = "https://api.vk.com/method/users.get"
+
+    async with ClientSession() as session:
+        async with session.get(url, params=params) as response:
+            text = await response.text()
+            data = json.loads(text)
+
+            return data['response']
+
+
 def write(data: str) -> None:
     with open("data.json", "w") as file:
         file.write(data)
@@ -152,7 +167,8 @@ def write(data: str) -> None:
 
 async def send_object_to_client(consumer: AsyncWebsocketConsumer, obj: Any) -> None:
     await consumer.send(text_data=json.dumps({
-        'data': dataclasses.asdict(obj)
+        'method': 'new_post_stat',
+        'value': dataclasses.asdict(obj)
     }))
 
 
@@ -184,6 +200,20 @@ def generate_excel(posts: List[Post]):
     return file_name
 
 
+def take_screenshot(link: str):
+    WINDOW_SIZE = "1220,1200"
+    options = ChromeOptions()
+    options.add_argument("--start-maximized")
+    options.add_argument("--headless")
+    options.add_argument("--window-size=%s" % WINDOW_SIZE)
+    driver = Chrome("./webdriver/chromedriver", chrome_options=options)
+
+    driver.get(link)
+    screenshot_name = f"{link.split('-')[1]}.png"
+    driver.save_screenshot(f'./static/screenshots/{screenshot_name}')
+    driver.close()
+
+
 async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -> str:
     posts = []
 
@@ -201,8 +231,11 @@ async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -
             members, member_items = await get_community_members(owner_id)
             views = await get_post_views(owner_id, post_id)
 
-            post = Post(club_link=id_group_map[owner_id]['screen_name'],
+            take_screenshot(link)
+
+            post = Post(club_link=f"https://vk.com/{id_group_map[owner_id]['screen_name']}",
                         club_name=id_group_map[owner_id]['name'],
+                        screenshot_name=f"{owner_id}_{post_id}.png".strip('-'),
                         comments_amount=comments_amount,
                         members_amount=members,
                         comments=comments,
@@ -217,3 +250,60 @@ async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -
             print(e)
 
     return generate_excel(posts)
+
+
+def save_users(data: Dict[str, List], file_name: str) -> str:
+    wb = Workbook()
+
+    for link, users in data.items():
+        sheet_name = link.split('-')[1]
+        ws = wb.create_sheet(sheet_name)
+        ws.append(["User ID", "Name", "Username"])
+        for user in users:
+            ws.append([f"https://vk.com/id{user['id']}", user['first_name'], user['last_name']])
+
+    wb.save(f"./static/files/{file_name}")
+
+    return file_name
+
+
+async def get_like_users(links: List[str]) -> str:
+    data_to_save = {}
+
+    for link in links:
+        try:
+            owner_id = int(link.split('wall')[1].split('_')[0])  # owner -- group, public page or user
+            post_id = int(link.split('-')[1].split('_')[1])
+            likes, like_users = await get_post_likes(owner_id, post_id)
+
+            users = await get_users_by_id(like_users)
+
+            data_to_save[link] = users
+        except Exception as e:
+            print(e)
+
+    like_users_file_name = save_users(data_to_save, "like_users.xlsx")
+
+    return like_users_file_name
+
+
+async def get_comment_users(links: List[str]) -> str:
+    data_to_save = {}
+
+    for link in links:
+        try:
+            owner_id = int(link.split('wall')[1].split('_')[0])  # owner -- group, public page or user
+            post_id = int(link.split('-')[1].split('_')[1])
+
+            likes, like_users = await get_post_likes(owner_id, post_id)
+            # comments_amount, comments = await get_post_comments(owner_id, post_id)
+
+            users = await get_users_by_id(like_users)
+
+            data_to_save[link] = users
+        except Exception as e:
+            print(e)
+
+    like_users_file_name = save_users(data_to_save, "comment_users.xlsx")
+
+    return like_users_file_name

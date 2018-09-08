@@ -20,28 +20,76 @@
 
 </head>
 <body>
-<div class="container pt-1 pb-5 ">
+<div class="container pt-1 pb-1 ">
     <form class="form-horizontal">
-        <textarea class="form-control mt-4 mb-4" rows="15" id="input"
+        <textarea class="form-control mt-4 mb-4" rows="8" id="input"
                   placeholder="Вставьте ссылки на посты (по одной на строку)"></textarea>
-        <div class="btn-group btn-group-justified " >
-                <button id="get_posts_stat" type="button" class="btn btn-info ">Собрать статистику по постам</button>
-                <button id="get_like_users" type="button" class="btn btn-info ">Выгрузить лайкнувших</button>
-                <button id="get_comment_users" type="button" class="btn btn-info ">Выгрузить прокомментировавших</button>
+        <div class="btn-group btn-group-justified ">
+            <button id="get_posts_stat" type="button" class="btn btn-info ">Собрать статистику по постам</button>
+            <button id="get_like_users" type="button" class="btn btn-info ">Выгрузить лайкнувших</button>
+            <button id="get_comment_users" type="button" class="btn btn-info ">Выгрузить прокомментировавших</button>
         </div>
     </form>
-
 </div>
-<div class="mx-auto pb-5" style="width: 400px; opacity: 0;" id="parsing-title" >
-    <img src="./static/gif/loading.gif"  ><h3>Парсим...</h3>
+<div class="mx-auto pb-1" style="width: 400px; opacity: 0;" id="parsing-title">
+    <img src="./static/gif/loading.gif">
+    <h3>Парсим...</h3>
+</div>
+<div class="row mb-3" id="post-stat">
+    <div class="col-1"></div>
+    <div class="col-10">
+        <table id="post-stat-table">
+            <thead>
+            <tr>
+                <td>Ссылка на запись</td>
+                <td> Название сообщества</td>
+                <td>Ссылка на сообщество</td>
+                <td> Количество подписчиков</td>
+                <td>Охват записи</td>
+                <td> Количество лайков</td>
+                <td> Количество комментариев</td>
+                <td>Скриншот</td>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    <div class="col-1"></div>
 </div>
 
 <style>
-    #parsing-title, .btn-group-justified{
+    html, body {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    #parsing-title, .btn-group-justified {
         display: flex;
         flex-direction: row;
         justify-content: center;
         align-items: center;
+    }
+
+    table {
+        opacity: 0;
+        width: 100%;
+        {#border: 1px solid #e4e4e4;#}
+    }
+
+    .reveal {
+        opacity: 1;
+    }
+
+    table td {
+        padding: 10px;
+        text-align: center;
+    }
+
+    tbody tr:hover{
+        background: #e2e5e8;
+        border-radius: 8px;
+        box-shadow: 0 0  5px #e2e5e8;
     }
 </style>
 
@@ -50,11 +98,17 @@
     var web_socket;
 
     function connect_websocket() {
-        web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
+        if (window.location.hostname == 'localhost') {
+            web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
+        } else {
+            web_socket = new WebSocket('wss://' + window.location.host + '/ws/');
+        }
+
     }
 
     function check_websocket_state() {
-        if (web_socket.readyState == 3 || web_socket.readyState == 2) {
+        console.log(web_socket)
+        if (web_socket.readyState != 1) {
             web_socket.close();
             connect_websocket();
         }
@@ -65,7 +119,7 @@
     $("#get_posts_stat").on("click", function (e) {
         check_websocket_state();
         var input = $("#input").val();
-        if(input.trim(' ')==''){
+        if (input.trim(' ') == '') {
             alert("Поле ввода пустое");
             return
         }
@@ -110,11 +164,32 @@
     web_socket.onmessage = function (e) {
         console.log(e);
         var data = JSON.parse(e.data);
+
+        if (data.method == 'new_post_stat') {
+            post = data.value;
+            $("table").addClass("reveal")
+            $("#post-stat-table tbody").append(`<tr><td><a href="${post.post_link}" target="_blank">${post.post_link}</a></td>
+                                                <td>${post.club_name}</td>
+                                                <td><a href="${post.club_link}" target="_blank">${post.club_link}</a></td>
+                                                <td>${post.members_amount}</td>
+                                                <td>${post.views}</td>
+                                                <td>${post.likes}</td>
+                                                <td>${post.comments_amount}</td>
+                                                <td><a href="./static/screenshots/${post.screenshot_name}" target="_blank">${post.screenshot_name}</a></td></tr>
+                                                `)
+        }
+
         if (data.method == 'report_completed') {
             var report_file_name = data.report_name;
             loading_link = 'http://' + window.location.host + '/static/files/' + report_file_name;
             window.location.href = loading_link;
             $("#parsing-title").css('opacity', '0');
+        }
+
+        if(data.method == 'like_users_parsed'){
+            var user_file = data.like_users_file;
+            loading_link = 'http://' + window.location.host + '/static/files/' + user_file;
+            window.location.href = loading_link;
         }
     };
 

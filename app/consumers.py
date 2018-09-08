@@ -1,7 +1,7 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
 import json
 
-from app.common import parse_posts_info
+from app.common import parse_posts_info, get_comment_users, get_like_users
 
 
 class AppConsumer(AsyncWebsocketConsumer):
@@ -19,9 +19,26 @@ class AppConsumer(AsyncWebsocketConsumer):
 
         links = [link.strip(' ') for link in data['data'].split('\n') if link != '']
 
-        report_name = await parse_posts_info(links=links, consumer=self)
+        if data['method'] == 'get_posts_stat':
+            report_name = await parse_posts_info(links=links, consumer=self)
 
-        await self.send(text_data=json.dumps({
-            'method': 'report_completed',
-            'report_name': report_name
-        }))
+            await self.send(text_data=json.dumps({
+                'method': 'report_completed',
+                'report_name': report_name
+            }))
+
+        elif data['method'] == 'get_like_users':
+            like_users_file = await get_like_users(links)
+
+            await self.send(text_data=json.dumps({
+                'method': 'like_users_parsed',
+                'like_users_file': like_users_file
+            }))
+
+        elif data['method'] == 'get_comment_users':
+            comment_users_file = await get_comment_users(links)
+
+            await self.send(text_data=json.dumps({
+                'method': 'comment_users_parsed',
+                'report_name': comment_users_file
+            }))
