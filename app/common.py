@@ -207,6 +207,7 @@ def take_screenshot(link: str):
     options.add_argument("--headless")
     options.add_argument("--window-size=%s" % WINDOW_SIZE)
     options.add_argument('--disable-gpu')
+    options.add_argument('--disable-dev-shm-usage')
     driver = Chrome("./webdriver/chromedriver", chrome_options=options)
 
     driver.get(link)
