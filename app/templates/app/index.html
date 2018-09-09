@@ -44,10 +44,10 @@
                 <td>Ссылка на запись</td>
                 <td> Название сообщества</td>
                 <td>Ссылка на сообщество</td>
-                <td> Количество подписчиков</td>
-                <td>Охват записи</td>
-                <td> Количество лайков</td>
-                <td> Количество комментариев</td>
+                <td>Подписчиков</td>
+                <td>Охват</td>
+                <td> Лайки</td>
+                <td> Комментарии</td>
                 <td>Скриншот</td>
             </tr>
             </thead>
@@ -75,6 +75,10 @@
         opacity: 0;
         width: 100%;
         {#border: 1px solid #e4e4e4;#}
+    }
+    
+    table thead{
+        text-decoration: underline;
     }
 
     .reveal {
@@ -122,6 +126,8 @@
             alert("Поле ввода пустое");
             return
         }
+
+        $("#post-stat-table tbody").empty();
         web_socket.send(JSON.stringify(
             {
                 'method': 'get_posts_stat',
@@ -144,6 +150,7 @@
             }
             )
         );
+        $("#parsing-title").css('opacity', '1');
     });
 
     $("#get_comment_users").on("click", function (e) {
@@ -157,6 +164,7 @@
             }
             )
         );
+        $("#parsing-title").css('opacity', '1');
     });
 
     web_socket.onmessage = function (e) {
@@ -165,7 +173,7 @@
 
         if (data.method == 'new_post_stat') {
             post = data.value;
-            $("table").addClass("reveal")
+            $("table").addClass("reveal");
             $("#post-stat-table tbody").append(`<tr><td><a href="${post.post_link}" target="_blank">${post.post_link}</a></td>
                                                 <td>${post.club_name}</td>
                                                 <td><a href="${post.club_link}" target="_blank">${post.club_link}</a></td>
@@ -178,23 +186,29 @@
         }
 
         if (data.method == 'report_completed') {
-            var report_file_name = data.report_name;
-            var archive_name = data.screenshot_archive_name;
-            var files_link = 'http://' + window.location.host + '/static/files/';
-            var archives_link = 'http://' + window.location.host + '/static/archives/';
-            window.location.href = files_link + report_file_name;
-            setTimeout(function(){
-                window.location.href = archives_link + archive_name;
-            }, 1000)
+            var archive_name = data.archive_name;
+            var archive_link = 'http://' + window.location.host + '/static/archives/' + archive_name;
+            window.location.href = archive_link;
 
             $("#parsing-title").css('opacity', '0');
         }
 
         if(data.method == 'like_users_parsed'){
             var user_file = data.like_users_file;
-            loading_link = 'http://' + window.location.host + '/static/files/' + user_file;
+            loading_link = 'http://' + window.location.host + '/static/reports/' + user_file;
             window.location.href = loading_link;
+
+            $("#parsing-title").css('opacity', '0');
         }
+
+        if(data.method == 'comment_users_parsed'){
+            var user_file = data.comment_users_file;
+            loading_link = 'http://' + window.location.host + '/static/reports/' + user_file;
+            window.location.href = loading_link;
+
+            $("#parsing-title").css('opacity', '0');
+        }
+
     };
 
     web_socket.onclose = function (e) {

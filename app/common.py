@@ -161,6 +161,9 @@ async def get_users_by_id(user_ids: List[int]):
             text = await response.text()
             data = json.loads(text)
 
+            if data.get('error'):
+                return []
+
             return data['response']
 
 
@@ -199,8 +202,8 @@ def generate_excel(posts: List[Post]):
     for i, column in enumerate(ws.columns):
         ws.column_dimensions[get_column_letter(i + 1)].width = 25
 
-    file_name = get_file_name()
-    wb.save(f"./static/files/{file_name}")
+    file_name = Path(get_file_name())
+    wb.save(f"./static/reports/{file_name.name}")
 
     return file_name
 
@@ -224,13 +227,14 @@ def take_screenshot(link: str):
     return screenshot_name
 
 
-def pack_screenshots(screenshot_names, report_name):
+def form_archive(screenshot_names, report_name):
+    report_path = STATIC_DIR / 'reports' / report_name
     archive_path = STATIC_DIR / 'archives' / (report_name.stem + '.zip')
     with ZipFile(archive_path, 'w', ZIP_DEFLATED) as archive:
+        archive.write(report_path)
         for screenshot_name in screenshot_names:
             screenshot_path = STATIC_DIR / 'screenshots' / screenshot_name
             archive.write(screenshot_path)
-
     archive.close()
 
     return archive_path.name
@@ -273,9 +277,9 @@ async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -
             print(e)
 
     report_name = generate_excel(posts)
-    package_name = pack_screenshots(screenshots, Path(report_name))
+    package_name = form_archive(screenshots, report_name)
 
-    return report_name, package_name
+    return package_name
 
 
 def save_users(data: Dict[str, List], file_name: str) -> str:
@@ -284,11 +288,14 @@ def save_users(data: Dict[str, List], file_name: str) -> str:
     for link, users in data.items():
         sheet_name = link.split('-')[1]
         ws = wb.create_sheet(sheet_name)
+        ws.append(["Ссылка на пост", link])
         ws.append(["User ID", "Name", "Username"])
         for user in users:
             ws.append([f"https://vk.com/id{user['id']}", user['first_name'], user['last_name']])
 
-    wb.save(f"./static/files/{file_name}")
+    # wb.remove(wb.get_sheet_by_name('Sheet'))
+    wb.save(f"./static/reports/{file_name}")
+    wb.close()
 
     return file_name
 
@@ -321,15 +328,14 @@ async def get_comment_users(links: List[str]) -> str:
             owner_id = int(link.split('wall')[1].split('_')[0])  # owner -- group, public page or user
             post_id = int(link.split('-')[1].split('_')[1])
 
-            likes, like_users = await get_post_likes(owner_id, post_id)
-            # comments_amount, comments = await get_post_comments(owner_id, post_id)
+            comments_amount, comments = await get_post_comments(owner_id, post_id)
 
-            users = await get_users_by_id(like_users)
+            users = await get_users_by_id([item['from_id'] for item in comments])
 
             data_to_save[link] = users
         except Exception as e:
             print(e)
 
-    like_users_file_name = save_users(data_to_save, "comment_users.xlsx")
+    comment_users_file_name = save_users(data_to_save, "comment_users.xlsx")
 
-    return like_users_file_name
+    return comment_users_file_name
