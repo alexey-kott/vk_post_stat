@@ -19,10 +19,12 @@ from vk_post_stat.settings import VK_SERVICE_TOKEN
 
 STATIC_DIR = Path('./static/')
 
-params = {
-    'v': '5.84',
-    'access_token': VK_SERVICE_TOKEN,
-}
+
+def get_params():
+    return {
+        'v': '5.84',
+        'access_token': VK_SERVICE_TOKEN,
+    }
 
 
 def delay(func):
@@ -63,7 +65,7 @@ async def get_user_info(user_id):
 @delay
 async def get_groups_info(links: List[str]) -> List[Dict[str, Any]]:  # get id, name, screen_name
     group_ids = [link.split('-')[1].split('_')[0] for link in links]
-
+    params = get_params()
     params['group_ids'] = ','.join(group_ids)
     url = "https://api.vk.com/method/groups.getById"
 
@@ -78,6 +80,7 @@ async def get_groups_info(links: List[str]) -> List[Dict[str, Any]]:  # get id, 
 
 @delay
 async def get_post_comments(owner_id: int, post_id: int) -> Tuple[int, List[Dict[str, Any]]]:
+    params = get_params()
     params['owner_id'] = owner_id
     params['post_id'] = post_id
     params['count'] = 1000
@@ -86,7 +89,6 @@ async def get_post_comments(owner_id: int, post_id: int) -> Tuple[int, List[Dict
     async with ClientSession() as session:
         async with session.get(url, params=params) as response:
             text = await response.text()
-            print(response.real_url)
             data = json.loads(text)
 
             return data['response']['count'], data['response']['items']
@@ -94,6 +96,7 @@ async def get_post_comments(owner_id: int, post_id: int) -> Tuple[int, List[Dict
 
 @delay
 async def get_post_likes(owner_id: int, item_id: int) -> Tuple[int, List[int]]:
+    params = get_params()
     params['type'] = 'post'
     params['owner_id'] = owner_id
     params['item_id'] = item_id
@@ -112,6 +115,7 @@ async def get_post_likes(owner_id: int, item_id: int) -> Tuple[int, List[int]]:
 async def get_post_reposts(owner_id: int, post_id: int) -> Tuple[List, List, List]:
     # Сейчас ВКонтакте возвращает пустые поля ответа, вряд ли это когда-то изменится
     # Связана такая ситуация с участившимися случаями посадки за репосты (ДА, ЭТО ПИЗДЕЦ)
+    params = get_params()
     params['owner_id'] = owner_id
     params['post_id'] = post_id
     params['count'] = 1000
@@ -127,6 +131,7 @@ async def get_post_reposts(owner_id: int, post_id: int) -> Tuple[List, List, Lis
 
 @delay
 async def get_community_members(group_id: Union[int, str]) -> Tuple[int, List[int]]:
+    params = get_params()
     params['group_id'] = str(group_id).strip('-')
     params['count'] = 1000
     url = "https://api.vk.com/method/groups.getMembers"
@@ -141,6 +146,7 @@ async def get_community_members(group_id: Union[int, str]) -> Tuple[int, List[in
 
 @delay
 async def get_post_views(owner_id: int, post_id: int) -> int:
+    params = get_params()
     params['posts'] = f"{owner_id}_{post_id}"
     params['count'] = 1000
     url = "https://api.vk.com/method/wall.getById"
@@ -155,6 +161,7 @@ async def get_post_views(owner_id: int, post_id: int) -> int:
 
 @delay
 async def get_users_by_id(user_ids: List[int]):
+    params = get_params()
     params['user_ids'] = str(user_ids)
     url = "https://api.vk.com/method/users.get"
 
