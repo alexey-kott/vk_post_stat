@@ -98,8 +98,8 @@
     var web_socket;
 
     function connect_websocket() {
-        web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
-        return
+        {#web_socket = new WebSocket('ws://' + window.location.host + '/ws/');#}
+        {#return#}
         if (window.location.hostname == 'localhost') {
             web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
         } else {
@@ -125,7 +125,6 @@
             alert("Поле ввода пустое");
             return
         }
-
         web_socket.send(JSON.stringify(
             {
                 'method': 'get_posts_stat',
@@ -183,8 +182,14 @@
 
         if (data.method == 'report_completed') {
             var report_file_name = data.report_name;
-            loading_link = 'http://' + window.location.host + '/static/files/' + report_file_name;
-            window.location.href = loading_link;
+            var archive_name = data.screenshot_archive_name;
+            var files_link = 'http://' + window.location.host + '/static/files/';
+            var archives_link = 'http://' + window.location.host + '/static/archives/';
+            window.location.href = files_link + report_file_name;
+            setTimeout(function(){
+                window.location.href = archives_link + archive_name;
+            }, 1000)
+
             $("#parsing-title").css('opacity', '0');
         }
 

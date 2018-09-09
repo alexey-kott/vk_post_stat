@@ -2,11 +2,13 @@ import dataclasses
 import json
 import time
 # from asyncio import sleep
+from pathlib import Path
 from time import sleep
 import hashlib
 from dataclasses import dataclass
 from typing import List, Dict, Any, Tuple, Union
 
+from zipfile import ZipFile, ZIP_DEFLATED
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from aiohttp import ClientSession
@@ -14,6 +16,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from selenium.webdriver import Chrome, ChromeOptions
 
 from vk_post_stat.settings import VK_SERVICE_TOKEN
+
+STATIC_DIR = Path('./static/')
 
 params = {
     'v': '5.84',
@@ -189,10 +193,11 @@ def generate_excel(posts: List[Post]):
                'Охват записи', 'Количество лайков', 'Количество комментариев'])
 
     for i, post in enumerate(posts):
-        ws.append([post.post_link, post.club_name, post.club_link, post.members_amount, post.views, post.likes, post.comments_amount])
+        ws.append([post.post_link, post.club_name, post.club_link, post.members_amount, post.views, post.likes,
+                   post.comments_amount])
 
     for i, column in enumerate(ws.columns):
-        ws.column_dimensions[get_column_letter(i+1)].width = 25
+        ws.column_dimensions[get_column_letter(i + 1)].width = 25
 
     file_name = get_file_name()
     wb.save(f"./static/files/{file_name}")
@@ -208,6 +213,7 @@ def take_screenshot(link: str):
     options.add_argument("--window-size=%s" % WINDOW_SIZE)
     options.add_argument('--disable-gpu')
     options.add_argument('--disable-dev-shm-usage')
+    # options.experimental_options("useAutomationExtension", False)
     driver = Chrome("./webdriver/chromedriver", chrome_options=options)
 
     driver.get(link)
@@ -215,9 +221,24 @@ def take_screenshot(link: str):
     driver.save_screenshot(f'./static/screenshots/{screenshot_name}')
     driver.close()
 
+    return screenshot_name
+
+
+def pack_screenshots(screenshot_names, report_name):
+    archive_path = STATIC_DIR / 'archives' / (report_name.stem + '.zip')
+    with ZipFile(archive_path, 'w', ZIP_DEFLATED) as archive:
+        for screenshot_name in screenshot_names:
+            screenshot_path = STATIC_DIR / 'screenshots' / screenshot_name
+            archive.write(screenshot_path)
+
+    archive.close()
+
+    return archive_path.name
+
 
 async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -> str:
     posts = []
+    screenshots = []
 
     groups = await get_groups_info(links)
     id_group_map = {-group['id']: group for group in groups}
@@ -233,7 +254,7 @@ async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -
             members, member_items = await get_community_members(owner_id)
             views = await get_post_views(owner_id, post_id)
 
-            take_screenshot(link)
+            screenshots.append(take_screenshot(link))
 
             post = Post(club_link=f"https://vk.com/{id_group_map[owner_id]['screen_name']}",
                         club_name=id_group_map[owner_id]['name'],
@@ -251,7 +272,10 @@ async def parse_posts_info(links: List[str], consumer: AsyncWebsocketConsumer) -
         except Exception as e:
             print(e)
 
-    return generate_excel(posts)
+    report_name = generate_excel(posts)
+    package_name = pack_screenshots(screenshots, Path(report_name))
+
+    return report_name, package_name
 
 
 def save_users(data: Dict[str, List], file_name: str) -> str:

@@ -20,11 +20,12 @@ class AppConsumer(AsyncWebsocketConsumer):
         links = [link.strip(' ') for link in data['data'].split('\n') if link != '']
 
         if data['method'] == 'get_posts_stat':
-            report_name = await parse_posts_info(links=links, consumer=self)
+            report_name, archive_name = await parse_posts_info(links=links, consumer=self)
 
             await self.send(text_data=json.dumps({
                 'method': 'report_completed',
-                'report_name': report_name
+                'report_name': report_name,
+                'screenshot_archive_name': archive_name
             }))
 
         elif data['method'] == 'get_like_users':
