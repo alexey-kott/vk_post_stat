@@ -11,6 +11,6 @@ if __name__ == "__main__":
     # options.experimental_options("useAutomationExtension", False)
     driver = Chrome("./webdriver/chromedriver", chrome_options=options)
 
-    driver.get("vk.com")
+    driver.get("https://vk.com")
     driver.save_screenshot(f'./static/screenshots/test_screenshot.png')
     driver.close()
