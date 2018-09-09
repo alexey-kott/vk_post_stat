@@ -214,7 +214,6 @@ def take_screenshot(link: str):
     options.add_argument('--disable-gpu')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument("--no-sandbox")
-    # options.experimental_options("useAutomationExtension", False)
     driver = Chrome("./webdriver/chromedriver", chrome_options=options)
 
     driver.get(link)

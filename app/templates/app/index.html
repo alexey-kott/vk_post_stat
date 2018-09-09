@@ -98,14 +98,11 @@
     var web_socket;
 
     function connect_websocket() {
-        {#web_socket = new WebSocket('ws://' + window.location.host + '/ws/');#}
-        {#return#}
-        if (window.location.hostname == 'localhost') {
+        if (window.location.protocol == 'http:') {
             web_socket = new WebSocket('ws://' + window.location.host + '/ws/');
         } else {
             web_socket = new WebSocket('wss://' + window.location.host + '/ws/');
         }
-
     }
 
     function check_websocket_state() {
