@@ -71,6 +71,7 @@ async def get_groups_info(links: List[str]) -> List[Dict[str, Any]]:  # get id, 
         async with session.get(url, params=params) as response:
             text = await response.text()
             data = json.loads(text)
+            params['group_ids'] = ''
 
             return data['response']
 
@@ -85,6 +86,7 @@ async def get_post_comments(owner_id: int, post_id: int) -> Tuple[int, List[Dict
     async with ClientSession() as session:
         async with session.get(url, params=params) as response:
             text = await response.text()
+            print(response.real_url)
             data = json.loads(text)
 
             return data['response']['count'], data['response']['items']
@@ -164,6 +166,7 @@ async def get_users_by_id(user_ids: List[int]):
             if data.get('error'):
                 return []
 
+            params['user_ids'] = ''
             return data['response']
 
 
@@ -330,11 +333,11 @@ async def get_comment_users(links: List[str]) -> str:
 
             comments_amount, comments = await get_post_comments(owner_id, post_id)
 
-            users = await get_users_by_id([item['from_id'] for item in comments])
+            users = await get_users_by_id({item['from_id'] for item in comments})
 
             data_to_save[link] = users
         except Exception as e:
-            print(e)
+            raise e
 
     comment_users_file_name = save_users(data_to_save, "comment_users.xlsx")
 
