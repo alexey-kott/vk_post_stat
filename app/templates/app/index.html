@@ -20,16 +20,25 @@
 
 </head>
 <body>
-<div class="container pt-1 pb-1 ">
+<div class="row pt-1 pb-1 ">
+    <div class="col-3"></div>
+    <div class="col-6">
     <form class="form-horizontal">
         <textarea class="form-control mt-4 mb-4" rows="8" id="input"
-                  placeholder="Вставьте ссылки на посты (по одной на строку)"></textarea>
+                  placeholder="Вставьте ссылки на посты (по одной на строку)" autofocus></textarea>
         <div class="btn-group btn-group-justified ">
             <button id="get_posts_stat" type="button" class="btn btn-info ">Собрать статистику по постам</button>
             <button id="get_like_users" type="button" class="btn btn-info ">Выгрузить лайкнувших</button>
             <button id="get_comment_users" type="button" class="btn btn-info ">Выгрузить прокомментировавших</button>
         </div>
     </form>
+    </div>
+    <div class="row-3">
+        <h4 class="text-center mt-3">Доступные отчёты</h4>
+        <ul class="available_reports">
+            <li>Отчётов пока нет</li>
+        </ul>
+    </div>
 </div>
 <div class="mx-auto pb-1" style="width: 400px; opacity: 0;" id="parsing-title">
     <img src="./static/gif/loading.gif">
@@ -74,10 +83,10 @@
     table {
         opacity: 0;
         width: 100%;
-        {#border: 1px solid #e4e4e4;#}
+    {#border: 1px solid #e4e4e4;#}
     }
-    
-    table thead{
+
+    table thead {
         text-decoration: underline;
     }
 
@@ -90,16 +99,35 @@
         text-align: center;
     }
 
-    tbody tr:hover{
+    tbody tr:hover {
         background: #e2e5e8;
         border-radius: 8px;
-        box-shadow: 0 0  5px #e2e5e8;
+        box-shadow: 0 0 5px #e2e5e8;
     }
 </style>
 
 
 <script>
     var web_socket;
+    var state = {};
+
+    function init_state(){
+        if(localStorage.getItem('state') != null){
+            state = JSON.parse(localStorage.getItem('state'));
+
+            $(".available_reports").empty();
+            state.reports.forEach(function(item, index, arr){
+                $(".available_reports").append(`<li>
+                                                     <a href="./static/archives/${item}">${item}</a>
+                                                </li>`)
+            })
+        }else{
+            state = {
+                "reports": []
+            };
+        }
+    }
+    init_state();
 
     function connect_websocket() {
         if (window.location.protocol == 'http:') {
@@ -110,7 +138,6 @@
     }
 
     function check_websocket_state() {
-        console.log(web_socket)
         if (web_socket.readyState != 1) {
             web_socket.close();
             connect_websocket();
@@ -119,59 +146,60 @@
 
     connect_websocket();
 
+    function send_data(data) {
+        try {
+            web_socket.send(JSON.stringify(data));
+        } catch (error) {
+            check_websocket_state();
+            setTimeout(500, send_data, data);
+        }
+    }
+
     $("#get_posts_stat").on("click", function (e) {
-        check_websocket_state();
-        var input = $("#input").val();
-        if (input.trim(' ') == '') {
+        let input = $("#input").val();
+        if (input.trim(' ') === '') {
             alert("Поле ввода пустое");
-            return
+            return;
         }
 
         $("#post-stat-table tbody").empty();
-        web_socket.send(JSON.stringify(
-            {
-                'method': 'get_posts_stat',
-                'data': input
-            }
-            )
-        );
+
+        let data = {
+            'method': 'get_posts_stat',
+            'data': input
+        };
+        send_data(data);
         $("#parsing-title").css('opacity', '1');
     });
 
 
     $("#get_like_users").on("click", function (e) {
-        check_websocket_state();
+        let input = $("#input").val();
 
-        var input = $("#input").val();
-        web_socket.send(JSON.stringify(
-            {
+        let data = {
                 'method': 'get_like_users',
                 'data': input
-            }
-            )
-        );
+            };
+        send_data(data);
         $("#parsing-title").css('opacity', '1');
     });
 
     $("#get_comment_users").on("click", function (e) {
-        check_websocket_state();
+        let input = $("#input").val();
 
-        var input = $("#input").val();
-        web_socket.send(JSON.stringify(
-            {
+        let data = {
                 'method': 'get_comment_users',
                 'data': input
-            }
-            )
-        );
+            };
+        send_data(data);
         $("#parsing-title").css('opacity', '1');
     });
 
     web_socket.onmessage = function (e) {
         console.log(e);
-        var data = JSON.parse(e.data);
+        let data = JSON.parse(e.data);
 
-        if (data.method == 'new_post_stat') {
+        if (data.method === 'new_post_stat') {
             post = data.value;
             $("table").addClass("reveal");
             $("#post-stat-table tbody").append(`<tr><td><a href="${post.post_link}" target="_blank">${post.post_link}</a></td>
@@ -185,30 +213,30 @@
                                                 `)
         }
 
-        if (data.method == 'report_completed') {
-            var archive_name = data.archive_name;
-            var archive_link = 'http://' + window.location.host + '/static/archives/' + archive_name;
-            window.location.href = archive_link;
+        if (data.method === 'report_completed') {
+            let archive_name = data.archive_name;
+            window.location.href = 'http://' + window.location.host + '/static/archives/' + archive_name;
+            state.reports.push(archive_name);
 
             $("#parsing-title").css('opacity', '0');
         }
 
-        if(data.method == 'like_users_parsed'){
-            var user_file = data.like_users_file;
-            loading_link = 'http://' + window.location.host + '/static/reports/' + user_file;
-            window.location.href = loading_link;
+        if (data.method === 'like_users_parsed') {
+            let file_link = data.like_users_file;
+            window.location.href = 'http://' + window.location.host + '/static/reports/' + file_link;
 
             $("#parsing-title").css('opacity', '0');
         }
 
-        if(data.method == 'comment_users_parsed'){
-            var user_file = data.comment_users_file;
-            loading_link = 'http://' + window.location.host + '/static/reports/' + user_file;
-            window.location.href = loading_link;
+        if (data.method === 'comment_users_parsed') {
+            let user_file = data.comment_users_file;
+            window.location.href = 'http://' + window.location.host + '/static/reports/' + user_file;
 
             $("#parsing-title").css('opacity', '0');
         }
 
+        localStorage.setItem('state', JSON.stringify(state));
+        init_state();
     };
 
     web_socket.onclose = function (e) {

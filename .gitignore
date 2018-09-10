@@ -3,5 +3,5 @@ venv/
 vk_post_stat/settings.py
 __pycache__/
 *.xlsx
-static/screenshots/*
 static/archives/*
+static/screenshots/*
